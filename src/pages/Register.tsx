@@ -6,28 +6,93 @@ import { useAuth } from '@/context/AuthContext';
 import authService from '@/services/auth.service';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { validateEmail, validatePassword, validateName } from '@/utils/validators';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  
+  // Estados del formulario
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: ''
   });
-  const [error, setError] = useState('');
+  
+  // Estados de errores
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
+  
+  const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Validar campos individuales
+  const validateField = (field: string, value: string) => {
+    let error = '';
+    
+    switch (field) {
+      case 'name':
+        error = validateName(value);
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        error = validatePassword(value);
+        break;
+    }
+    
+    setErrors(prev => ({ ...prev, [field]: error }));
+  };
+
+  // Manejar cambios en inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Limpiar error al escribir
+    if (errors[name as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    
+    if (apiError) {
+      setApiError('');
+    }
+  };
+
+  // Validar al perder foco
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    validateField(name, value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    
+    // Validar todos los campos
+    const nameErr = validateName(formData.name);
+    const emailErr = validateEmail(formData.email);
+    const passwordErr = validatePassword(formData.password);
+
+    setErrors({
+      name: nameErr,
+      email: emailErr,
+      password: passwordErr
+    });
+
+    // Si hay errores, no continuar
+    if (nameErr || emailErr || passwordErr) {
+      return;
+    }
+
+    setApiError('');
     setLoading(true);
 
     try {
@@ -45,7 +110,7 @@ export const Register: React.FC = () => {
 
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al registrarse');
+      setApiError(err.response?.data?.message || 'Error al registrarse');
     } finally {
       setLoading(false);
     }
@@ -73,8 +138,8 @@ export const Register: React.FC = () => {
           </div>
 
           <div className="auth-card__body">
-            <form onSubmit={handleSubmit} className="form">
-              {error && (
+            <form onSubmit={handleSubmit} className="form" noValidate>
+              {apiError && (
                 <div
                   style={{
                     padding: 'var(--spacing-md)',
@@ -84,7 +149,7 @@ export const Register: React.FC = () => {
                     textAlign: 'center'
                   }}
                 >
-                  {error}
+                  {apiError}
                 </div>
               )}
 
@@ -95,7 +160,8 @@ export const Register: React.FC = () => {
                 placeholder="Tu nombre completo"
                 value={formData.name}
                 onChange={handleChange}
-                required
+                onBlur={handleBlur}
+                error={errors.name}
               />
 
               <Input
@@ -105,7 +171,8 @@ export const Register: React.FC = () => {
                 placeholder="usuario@ejemplo.com"
                 value={formData.email}
                 onChange={handleChange}
-                required
+                onBlur={handleBlur}
+                error={errors.email}
               />
 
               <Input
@@ -115,8 +182,8 @@ export const Register: React.FC = () => {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
-                required
-                minLength={6}
+                onBlur={handleBlur}
+                error={errors.password}
               />
 
               <Button type="submit" fullWidth disabled={loading}>

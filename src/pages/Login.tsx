@@ -5,25 +5,70 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { validateEmail, validatePassword } from '@/utils/validators';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  
+  // Estados del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  
+  // Estados de errores
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [apiError, setApiError] = useState('');
+  
   const [loading, setLoading] = useState(false);
+
+  // Validar campo individual
+  const handleEmailBlur = () => {
+    const error = validateEmail(email);
+    setEmailError(error);
+  };
+
+  const handlePasswordBlur = () => {
+    const error = validatePassword(password);
+    setPasswordError(error);
+  };
+
+  // Limpiar error al escribir
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (emailError) setEmailError('');
+    if (apiError) setApiError('');
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (passwordError) setPasswordError('');
+    if (apiError) setApiError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    
+    // Validar todos los campos
+    const emailErr = validateEmail(email);
+    const passwordErr = validatePassword(password);
+
+    setEmailError(emailErr);
+    setPasswordError(passwordErr);
+
+    // Si hay errores, no continuar
+    if (emailErr || passwordErr) {
+      return;
+    }
+
+    setApiError('');
     setLoading(true);
 
     try {
       await login({ email, password });
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión');
+      setApiError(err.response?.data?.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -51,8 +96,8 @@ export const Login: React.FC = () => {
           </div>
 
           <div className="auth-card__body">
-            <form onSubmit={handleSubmit} className="form">
-              {error && (
+            <form onSubmit={handleSubmit} className="form" noValidate>
+              {apiError && (
                 <div
                   style={{
                     padding: 'var(--spacing-md)',
@@ -62,7 +107,7 @@ export const Login: React.FC = () => {
                     textAlign: 'center'
                   }}
                 >
-                  {error}
+                  {apiError}
                 </div>
               )}
 
@@ -71,8 +116,9 @@ export const Login: React.FC = () => {
                 label="USUARIO"
                 placeholder="usuario@ejemplo.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                error={emailError}
               />
 
               <Input
@@ -80,8 +126,9 @@ export const Login: React.FC = () => {
                 label="CONTRASEÑA"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+                onChange={handlePasswordChange}
+                onBlur={handlePasswordBlur}
+                error={passwordError}
               />
 
               <Button type="submit" fullWidth disabled={loading}>

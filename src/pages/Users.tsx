@@ -10,6 +10,7 @@ import Card from '@/components/common/Card';
 import Modal from '@/components/common/Modal';
 import Input from '@/components/common/Input';
 import Loader from '@/components/common/Loader';
+import { validateEmail, validatePassword, validateName } from '@/utils/validators';
 
 export const Users: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -30,6 +31,14 @@ export const Users: React.FC = () => {
     password: '',
     role: 'user' as 'user' | 'admin'
   });
+  
+  // Estados de errores
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
+  
   const [formError, setFormError] = useState('');
 
   // Verificar que sea admin
@@ -60,6 +69,7 @@ export const Users: React.FC = () => {
   const handleOpenCreate = () => {
     setModalType('create');
     setFormData({ name: '', email: '', password: '', role: 'user' });
+    setFormErrors({ name: '', email: '', password: '' });
     setFormError('');
     setSelectedUser(null);
     setModalOpen(true);
@@ -73,6 +83,7 @@ export const Users: React.FC = () => {
       password: '',
       role: user.role
     });
+    setFormErrors({ name: '', email: '', password: '' });
     setFormError('');
     setSelectedUser(user);
     setModalOpen(true);
@@ -81,12 +92,81 @@ export const Users: React.FC = () => {
   const handleCloseModal = () => {
     setModalOpen(false);
     setFormData({ name: '', email: '', password: '', role: 'user' });
+    setFormErrors({ name: '', email: '', password: '' });
     setFormError('');
     setSelectedUser(null);
   };
 
+  // Validar campo individual
+  const validateField = (field: string, value: string) => {
+    let error = '';
+    
+    switch (field) {
+      case 'name':
+        error = validateName(value);
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        // Solo validar contraseña si está creando o si hay valor al editar
+        if (modalType === 'create' || value) {
+          error = validatePassword(value);
+        }
+        break;
+    }
+    
+    setFormErrors(prev => ({ ...prev, [field]: error }));
+  };
+
+  // Manejar cambios
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Limpiar error al escribir
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    
+    if (formError) {
+      setFormError('');
+    }
+  };
+
+  // Validar al perder foco
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    validateField(name, value);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar todos los campos
+    const nameErr = validateName(formData.name);
+    const emailErr = validateEmail(formData.email);
+    let passwordErr = '';
+    
+    if (modalType === 'create') {
+      passwordErr = validatePassword(formData.password);
+    } else if (formData.password) {
+      // Solo validar si se está cambiando la contraseña al editar
+      passwordErr = validatePassword(formData.password);
+    }
+
+    setFormErrors({
+      name: nameErr,
+      email: emailErr,
+      password: passwordErr
+    });
+
+    // Si hay errores, no continuar
+    if (nameErr || emailErr || passwordErr) {
+      return;
+    }
+
     setFormError('');
 
     try {
@@ -219,7 +299,7 @@ export const Users: React.FC = () => {
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="form">
+        <form onSubmit={handleSubmit} className="form" noValidate>
           {formError && (
             <div
               style={{
@@ -235,28 +315,34 @@ export const Users: React.FC = () => {
 
           <Input
             type="text"
+            name="name"
             label="Nombre"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            error={formErrors.name}
           />
 
           <Input
             type="email"
+            name="email"
             label="Email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            error={formErrors.email}
           />
 
           {modalType === 'create' && (
             <Input
               type="password"
+              name="password"
               label="Contraseña"
+              placeholder="Mínimo 8 caracteres"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required={modalType === 'create'}
-              minLength={6}
+              onChange={handleInputChange}
+              onBlur={handleBlur}
+              error={formErrors.password}
             />
           )}
 
